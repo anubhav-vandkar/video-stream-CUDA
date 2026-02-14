@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <vector>
 #include <chrono>
-#include "cpu_utils.h"
+#include "dct/cpu_utils.h"
 #include "dct/gpu_quant.h"
 #include "dct/gpu_idct.h"
 
