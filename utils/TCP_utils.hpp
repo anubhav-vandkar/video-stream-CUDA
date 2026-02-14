@@ -13,7 +13,8 @@ using namespace std;
 #define ACK 2
 #define FIN 4
 
-const int MSS = 1024;
+const int MSS = 1472;
+const int ACK_FREQUENCY = 4;  // Send ACK every N packets
 using ms = chrono::milliseconds;
 
 struct TCPHeader {
@@ -213,26 +214,32 @@ void receiveFileData(int sockfd, sockaddr_in &sender, const char *outfile) {
             break;
         }
 
+        static int ack_counter = 0;
+        
         if (hdr.seq == expected_seq) {
             // In-order packet
             data.insert(data.end(), buf + 11, buf + 11 + hdr.length);
             expected_seq += hdr.length;
+            ack_counter++;
         } else {
             // Out-of-order: ignore (GBN behavior)
             cout << "Dropped out-of-order packet with seq=" << hdr.seq << "\n";
         }
 
-        // Send ACK for next byte
-        TCPHeader ack{};
-        ack.seq = 0;
-        ack.ack = expected_seq;
-        ack.flags = ACK;
-        ack.length = 0;
+        // Send cumulative ACK every ACK_FREQUENCY packets
+        if (ack_counter >= ACK_FREQUENCY) {
+            TCPHeader ack{};
+            ack.seq = 0;
+            ack.ack = expected_seq;
+            ack.flags = ACK;
+            ack.length = 0;
 
-        char ackbuf[11];
-        serializeHeader(ack, ackbuf);
-        sendto(sockfd, ackbuf, 11, 0, (sockaddr*)&sender, slen);
-        cout << "Sent ACK=" << expected_seq << "\n";
+            char ackbuf[11];
+            serializeHeader(ack, ackbuf);
+            sendto(sockfd, ackbuf, 11, 0, (sockaddr*)&sender, slen);
+            cout << "Sent ACK=" << expected_seq << "\n";
+            ack_counter = 0;
+        }
     }
 
     // write final file
