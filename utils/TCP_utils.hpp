@@ -104,8 +104,6 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
                    segments[next].size(), 0,
                    (sockaddr*)&dest, dlen);
 
-            cout << "Sent segment with seq=" << seqs[next] << "\n";
-
             if (!timer_running) {
                 timer_running = true;
                 timer_start = chrono::steady_clock::now();
@@ -130,18 +128,12 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
             deserializeHeader(ackhdr, buf);
             uint32_t acknum = ackhdr.ack;
 
-            cout << "Received ACK=" << acknum 
-                    << " (base seq=" << seqs[base] 
-                    << ", payload=" << (segments[base].size() - 11)
-                    << ")\n";
-
             // Slide window
             while (base < total) {
                 uint32_t seg_seq = seqs[base];
                 uint32_t payload = (uint32_t)(segments[base].size() - 11);
 
                 if (acknum >= seg_seq + payload) {
-                    cout << "Base advanced from " << base << " to " << (base+1) << "\n";
                     base++;
                 } else {
                     break;
@@ -162,16 +154,13 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
             int elapsed = chrono::duration_cast<ms>(now - timer_start).count();
 
             if (elapsed > TIMEOUT) {
-                cout << "TIMEOUT — retransmitting window starting at seq="
-                          << seqs[base] << "\n";
+                cout << "TIMEOUT — retransmitting " << WINDOW << " segments\n";
 
                 // Retransmit ALL unACKed segments (Go-Back-N)
                 for (int i = base; i < next; i++) {
                     sendto(sockfd, segments[i].data(),
                            segments[i].size(), 0,
                            (sockaddr*)&dest, dlen);
-
-                    cout << "Resent segment seq=" << seqs[i] << "\n";
                 }
 
                 timer_start = chrono::steady_clock::now();
@@ -215,19 +204,25 @@ void receiveFileData(int sockfd, sockaddr_in &sender, const char *outfile) {
         }
 
         static int ack_counter = 0;
+        bool should_send_ack = false;
         
         if (hdr.seq == expected_seq) {
             // In-order packet
             data.insert(data.end(), buf + 11, buf + 11 + hdr.length);
             expected_seq += hdr.length;
             ack_counter++;
+            
+            // Send cumulative ACK every ACK_FREQUENCY packets
+            if (ack_counter >= ACK_FREQUENCY) {
+                should_send_ack = true;
+                ack_counter = 0;
+            }
         } else {
-            // Out-of-order: ignore (GBN behavior)
-            cout << "Dropped out-of-order packet with seq=" << hdr.seq << "\n";
+            // Out-of-order: send immediate ACK to signal gap to sender
+            should_send_ack = true;
         }
 
-        // Send cumulative ACK every ACK_FREQUENCY packets
-        if (ack_counter >= ACK_FREQUENCY) {
+        if (should_send_ack) {
             TCPHeader ack{};
             ack.seq = 0;
             ack.ack = expected_seq;
@@ -237,8 +232,6 @@ void receiveFileData(int sockfd, sockaddr_in &sender, const char *outfile) {
             char ackbuf[11];
             serializeHeader(ack, ackbuf);
             sendto(sockfd, ackbuf, 11, 0, (sockaddr*)&sender, slen);
-            cout << "Sent ACK=" << expected_seq << "\n";
-            ack_counter = 0;
         }
     }
 
