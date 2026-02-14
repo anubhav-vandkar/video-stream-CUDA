@@ -46,7 +46,7 @@ __global__ void idct_kernel(const float* d_in, unsigned char* d_out, int W, int 
 }
 
 //LOAD COSINE MATRIX
-void load_cosine_matrix(const float* cosine_matrix) {
+void load_cosine_matrix_idct(const float* cosine_matrix) {
     cudaMemcpyToSymbol(COSINE_MATRIX, cosine_matrix, BLOCK_SIZE * BLOCK_SIZE * sizeof(float));
 }
 

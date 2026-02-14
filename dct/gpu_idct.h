@@ -3,7 +3,7 @@
 
 #include <cuda_runtime.h>
 
-void load_cosine_matrix(const float* cosine_matrix);
+void load_cosine_matrix_idct(const float* cosine_matrix);
 
 void gpu_idct(const float* d_dct, unsigned char* d_frame_out, int width, int height, cudaStream_t stream);
 
