@@ -112,12 +112,12 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        cout << "Usage: " << argv[0] << " <video_file>" << endl;
+        cout << "Usage: " << argv[0] << " <file_name_with_extension>" << endl;
         return 1;
     }
-    
-    const char* video_path = argv[1];
-    const char* output_dir = "output_gpu";
+
+    const char* video_path = "../videos/input/" + argv[1];
+    const char* output_dir = "../videos/output_gpu/";
     
     system("mkdir -p output_gpu");
     

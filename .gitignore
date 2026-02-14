@@ -39,3 +39,7 @@
 
 # debug information files
 *.dwo
+
+#media files
+*.mp4
+*.png
