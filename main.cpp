@@ -143,6 +143,10 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
                 
         gpu_quantize(d_dct, d_quantized, QUANTIZATION, width, height, stream);
         cudaStreamSynchronize(stream);
+
+        cudaMemcpy(h_quantized, d_quantized, width * height * sizeof(short),
+                cudaMemcpyDeviceToHost);  // Move this up!
+
         if (frame_count == 0) {
             cout << "After GPU quantize, first 20 values:\n";
             for (int i = 0; i < 20; i++) {
@@ -158,10 +162,7 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
             }
             cout << "Quantized range: [" << min_val << ", " << max_val << "]\n";
         }
-        
-        cudaMemcpyAsync(h_quantized, d_quantized, width * height * sizeof(short),
-                       cudaMemcpyDeviceToHost, stream);
-        
+
         cudaStreamSynchronize(stream);
 
         int compressed_size = LZ4_compress_default(
