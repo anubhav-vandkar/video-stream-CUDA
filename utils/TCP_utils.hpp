@@ -203,36 +203,22 @@ void receiveFileData(int sockfd, sockaddr_in &sender, const char *outfile) {
             break;
         }
 
-        static int ack_counter = 0;
-        bool should_send_ack = false;
-        
         if (hdr.seq == expected_seq) {
             // In-order packet
             data.insert(data.end(), buf + 11, buf + 11 + hdr.length);
             expected_seq += hdr.length;
-            ack_counter++;
-            
-            // Send cumulative ACK every ACK_FREQUENCY packets
-            if (ack_counter >= ACK_FREQUENCY) {
-                should_send_ack = true;
-                ack_counter = 0;
-            }
-        } else {
-            // Out-of-order: send immediate ACK to signal gap to sender
-            should_send_ack = true;
         }
 
-        if (should_send_ack) {
-            TCPHeader ack{};
-            ack.seq = 0;
-            ack.ack = expected_seq;
-            ack.flags = ACK;
-            ack.length = 0;
+        // Send ACK for every packet
+        TCPHeader ack{};
+        ack.seq = 0;
+        ack.ack = expected_seq;
+        ack.flags = ACK;
+        ack.length = 0;
 
-            char ackbuf[11];
-            serializeHeader(ack, ackbuf);
-            sendto(sockfd, ackbuf, 11, 0, (sockaddr*)&sender, slen);
-        }
+        char ackbuf[11];
+        serializeHeader(ack, ackbuf);
+        sendto(sockfd, ackbuf, 11, 0, (sockaddr*)&sender, slen);
     }
 
     // write final file
