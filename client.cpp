@@ -9,81 +9,6 @@
 
 using namespace std;
 
-/*
-
-int not_main(int argc, char *argv[]) {
-
-    if (argc != 2) {
-        cerr << "Usage: ./receiver <output_file>\n";
-        return 1;
-    }
-
-    const char *outfile = argv[1];
-
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(8080);
-    addr.sin_addr.s_addr = INADDR_ANY;
-
-    bind(sockfd, (sockaddr*)&addr, sizeof(addr));
-
-    char buf[1500];
-    TCPHeader hdr;
-
-    sockaddr_in sender{};
-    socklen_t slen = sizeof(sender);
-
-    // Wait for SYN
-    while (true) {
-        int n = recvfrom(sockfd, buf, sizeof(buf), 0,
-                         (sockaddr*)&sender, &slen);
-        if (n < 11) continue;
-
-        deserializeHeader(hdr, buf);
-
-        if (hdr.flags & SYN) {
-            cout << "Received SYN\n";
-            break;
-        }
-    }
-
-    // Send SYN-ACK
-    TCPHeader synack{};
-    synack.seq = 1000;
-    synack.ack = hdr.seq + 1;
-    synack.flags = SYN | ACK;
-    synack.length = 0;
-
-    serializeHeader(synack, buf);
-    sendto(sockfd, buf, 11, 0, (sockaddr*)&sender, slen);
-    cout << "Sent SYN-ACK\n";
-
-    // Wait for final ACK
-    while (true) {
-        int n = recvfrom(sockfd, buf, sizeof(buf), 0,
-                         (sockaddr*)&sender, &slen);
-
-        if (n < 11) continue;
-
-        deserializeHeader(hdr, buf);
-
-        if (hdr.flags & ACK) {
-            cout << "Received final ACK\n";
-            break;
-        }
-    }
-
-    cout << "Connection established!\n";
-
-    receiveFileData(sockfd, sender, outfile);
-
-    close(sockfd);
-    return 0;
-}
-*/
-
 int main(int argc, char* argv[]){
 
     if (argc != 4) {
@@ -112,8 +37,7 @@ int main(int argc, char* argv[]){
     socklen_t dlen = sizeof(dest);
     TCPHeader hdr;
 
-    // ===== 3-WAY HANDSHAKE =====
-    // Step 1: Send SYN
+    // Send SYN
     TCPHeader syn{};
     syn.seq = 1;
     syn.ack = 0;
@@ -124,7 +48,7 @@ int main(int argc, char* argv[]){
     sendto(client_fd, buf, 11, 0, (sockaddr*)&dest, dlen);
     cout << "Client: Sent SYN\n";
 
-    // Step 2: Wait for SYN-ACK
+    // Wait for SYN-ACK
     auto last = clock::now();
     while (true) {
         fd_set fds;
@@ -155,7 +79,7 @@ int main(int argc, char* argv[]){
         }
     }
 
-    // Step 3: Send final ACK
+    // Send final ACK
     TCPHeader ack{};
     ack.seq = hdr.ack;
     ack.ack = hdr.seq + 1;

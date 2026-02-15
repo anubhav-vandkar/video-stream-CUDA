@@ -40,7 +40,7 @@ int main(int argc, char *argv[]){
         return 1;
     }
 
-    cout << "Server listening on port 9000...\n";
+    cout << "Server listening on port 9000";
 
     char title_buffer[1500];
     TCPHeader hdr;
@@ -48,10 +48,9 @@ int main(int argc, char *argv[]){
     socklen_t slen = sizeof(client);
 
     while(1) {
-        cout << "\nWaiting for client connection...\n";
+        cout << "Waiting for client connection";
 
-        // ===== 3-WAY HANDSHAKE =====
-        // Step 1: Wait for SYN
+        // Wait for SYN
         while (true) {
             int n = recvfrom(server_fd, title_buffer, sizeof(title_buffer), 0, 
                             (sockaddr*)&client, &slen);
@@ -66,7 +65,7 @@ int main(int argc, char *argv[]){
             }
         }
 
-        // Step 2: Send SYN-ACK
+        // Send SYN-ACK
         TCPHeader synack{};
         synack.seq = 1000;
         synack.ack = hdr.seq + 1;
@@ -77,7 +76,7 @@ int main(int argc, char *argv[]){
         sendto(server_fd, title_buffer, 11, 0, (sockaddr*)&client, slen);
         cout << "Server: Sent SYN-ACK\n";
 
-        // Step 3: Wait for final ACK
+        // Wait for final ACK
         bool handshake_done = false;
         auto handshake_start = chrono::steady_clock::now();
         
@@ -111,7 +110,7 @@ int main(int argc, char *argv[]){
 
         if (!handshake_done) continue;
 
-        // ===== RECEIVE FILENAME REQUEST =====
+        // RECEIVE FILENAME REQUEST 
         cout << "Server: Waiting for filename request...\n";
         
         bool got_filename = false;
@@ -132,7 +131,7 @@ int main(int argc, char *argv[]){
                 if (n >= 11) {
                     deserializeHeader(hdr, title_buffer);
                     
-                    // Check if this is data (filename request)
+                    // filename request
                     if (!(hdr.flags & SYN) && !(hdr.flags & FIN) && hdr.length > 0) {
                         memcpy(requested_file, title_buffer + 11, hdr.length);
                         requested_file[hdr.length] = '\0';
@@ -152,7 +151,7 @@ int main(int argc, char *argv[]){
 
         if (!got_filename) continue;
 
-        // ===== SEND FILE DATA =====
+        // SEND FILE DATA
         string full_path = file_dir + requested_file;
         
         ifstream file_check(full_path, ios::binary);

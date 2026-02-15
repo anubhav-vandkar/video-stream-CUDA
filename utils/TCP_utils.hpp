@@ -6,7 +6,6 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-#include <sys/socket.h>
 
 using namespace std;
 
@@ -15,7 +14,6 @@ using namespace std;
 #define FIN 4
 
 const int MSS = 1472;
-const int ACK_FREQUENCY = 4;  // Send ACK every N packets
 using ms = chrono::milliseconds;
 
 struct TCPHeader {
@@ -88,7 +86,7 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
     int total = segments.size();
     int base = 0;
     int next = 0;
-    int WINDOW = 8; // increased window for higher latency/cloud networks
+    int WINDOW = 4;
 
     char buf[1500];
     socklen_t dlen = sizeof(dest);
@@ -96,12 +94,7 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
 
     bool timer_running = false;
     auto timer_start = chrono::steady_clock::now();
-    const int TIMEOUT = 1500; // ms (increased for cloud latency)
-
-    // Increase socket buffers to reduce drops on high-throughput links
-    int sock_buf = 4 * 1024 * 1024; // 4MB
-    setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &sock_buf, sizeof(sock_buf));
-    setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &sock_buf, sizeof(sock_buf));
+    const int TIMEOUT = 1500; // ms
 
     while (base < total) {
         // Send packets within window
@@ -109,6 +102,8 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
             sendto(sockfd, segments[next].data(),
                    segments[next].size(), 0,
                    (sockaddr*)&dest, dlen);
+
+            cout << "Sent segment with seq=" << seqs[next] << "\n";
 
             if (!timer_running) {
                 timer_running = true;
@@ -125,40 +120,38 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
 
         timeval tv;
         tv.tv_sec = 0;
-        tv.tv_usec = 20000;  // 200ms polling
+        tv.tv_usec = 20000;  // 20ms polling
 
         int rv = select(sockfd+1, &fds, NULL, NULL, &tv);
 
         if (rv > 0) {
             int n = recvfrom(sockfd, buf, sizeof(buf), 0, NULL, NULL);
-            if (n >= 11) {
-                deserializeHeader(ackhdr, buf);
-                uint32_t acknum = ackhdr.ack;
-                cout << "Server received ACK=" << acknum << " (base=" << base << ", next=" << next << ")\n";
+            deserializeHeader(ackhdr, buf);
+            uint32_t acknum = ackhdr.ack;
 
-                // Slide window
-                int old_base = base;
-                while (base < total) {
-                    uint32_t seg_seq = seqs[base];
-                    uint32_t payload = (uint32_t)(segments[base].size() - 11);
+            cout << "Received ACK=" << acknum 
+                    << " (base seq=" << seqs[base] 
+                    << ", payload=" << (segments[base].size() - 11)
+                    << ")\n";
 
-                    if (acknum >= seg_seq + payload) {
-                        base++;
-                    } else {
-                        break;
-                    }
-                }
-                if (base > old_base) {
-                    cout << "  Window advanced: base " << old_base << " -> " << base << "\n";
-                }
-                
-                // Reset or stop timer on ACK received
-                if (base == next) {
-                    timer_running = false;
+            // Slide window
+            while (base < total) {
+                uint32_t seg_seq = seqs[base];
+                uint32_t payload = (uint32_t)(segments[base].size() - 11);
+
+                if (acknum >= seg_seq + payload) {
+                    cout << "Base advanced from " << base << " to " << (base+1) << "\n";
+                    base++;
                 } else {
-                    timer_running = true;
-                    timer_start = chrono::steady_clock::now();
+                    break;
                 }
+            }
+
+            // Timer handling
+            if (base == next) {
+                timer_running = false;
+            } else {
+                timer_start = chrono::steady_clock::now();
             }
         }
 
@@ -168,13 +161,16 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
             int elapsed = chrono::duration_cast<ms>(now - timer_start).count();
 
             if (elapsed > TIMEOUT) {
-                cout << "TIMEOUT — retransmitting " << WINDOW << " segments\n";
+                cout << "TIMEOUT — retransmitting window starting at seq="
+                          << seqs[base] << "\n";
 
                 // Retransmit ALL unACKed segments (Go-Back-N)
                 for (int i = base; i < next; i++) {
                     sendto(sockfd, segments[i].data(),
                            segments[i].size(), 0,
                            (sockaddr*)&dest, dlen);
+
+                    cout << "Resent segment seq=" << seqs[i] << "\n";
                 }
 
                 timer_start = chrono::steady_clock::now();
@@ -204,10 +200,6 @@ void receiveFileData(int sockfd, sockaddr_in &sender, const char *outfile) {
     socklen_t slen = sizeof(sender);
     TCPHeader hdr;
 
-    // Increase receive buffer to reduce packet drops under load
-    int sock_buf = 4 * 1024 * 1024; // 4MB
-    setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &sock_buf, sizeof(sock_buf));
-
     while (true) {
         int n = recvfrom(sockfd, buf, sizeof(buf), 0,
                          (sockaddr*)&sender, &slen);
@@ -225,10 +217,12 @@ void receiveFileData(int sockfd, sockaddr_in &sender, const char *outfile) {
             // In-order packet
             data.insert(data.end(), buf + 11, buf + 11 + hdr.length);
             expected_seq += hdr.length;
-            cout << "Received " << hdr.length << " bytes\n";  // <-- ADD THIS
+        } else {
+            // Out-of-order: ignore (GBN behavior)
+            cout << "Dropped out-of-order packet with seq=" << hdr.seq << "\n";
         }
 
-        // Send ACK for every packet
+        // Send ACK for next byte
         TCPHeader ack{};
         ack.seq = 0;
         ack.ack = expected_seq;
@@ -238,6 +232,7 @@ void receiveFileData(int sockfd, sockaddr_in &sender, const char *outfile) {
         char ackbuf[11];
         serializeHeader(ack, ackbuf);
         sendto(sockfd, ackbuf, 11, 0, (sockaddr*)&sender, slen);
+        cout << "Sent ACK=" << expected_seq << "\n";
     }
 
     // write final file
