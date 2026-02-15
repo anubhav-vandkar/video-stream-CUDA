@@ -145,12 +145,8 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
                 if (base > old_base) {
                     cout << "  Window advanced: base " << old_base << " -> " << base << "\n";
                 }
-            }
-
-            // Timer handling
-            if (base == next) {
-                timer_running = false;
-            } else {
+                
+                // Always reset timer on ACK received
                 timer_start = chrono::steady_clock::now();
             }
         }
