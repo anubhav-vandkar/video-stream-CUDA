@@ -65,6 +65,31 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
         
         cudaMemcpyAsync(d_frame_uint8, gray.data, width * height,
                        cudaMemcpyHostToDevice, stream);
+
+        if (frame_count == 0) {
+            // Check what's being sent to GPU
+            cout << "Grayscale frame first 20 pixels:\n";
+            for (int i = 0; i < 20; i++) {
+                cout << (int)gray.data[i] << " ";
+            }
+            cout << "\n";
+            
+            // After copying to GPU and converting to float
+            // Copy d_frame_float back to check
+            float* h_check = new float[width * height];
+            
+            // After uint8_to_float kernel, before DCT:
+            cudaMemcpy(h_check, d_frame_float, width * height * sizeof(float),
+                    cudaMemcpyDeviceToHost);
+            
+            cout << "After uint8_to_float, first 20 values:\n";
+            for (int i = 0; i < 20; i++) {
+                cout << h_check[i] << " ";
+            }
+            cout << "\n";
+            
+            delete[] h_check;
+        }
         
         gpu_dct(d_frame_uint8, d_frame_float, d_dct, width, height, stream);
 
