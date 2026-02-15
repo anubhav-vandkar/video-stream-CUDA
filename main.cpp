@@ -82,8 +82,9 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
     while (cap.read(frame)) {
         cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
         
-        cudaMemcpyAsync(d_frame_uint8, gray.data, width * height, cudaMemcpyHostToDevice, stream);
-        cudaStreamSynchronize(stream);  
+        cudaMemcpy(d_frame_uint8, gray.data, width * height,
+          cudaMemcpyHostToDevice);
+        //cudaStreamSynchronize(stream);  
         if (frame_count == 0) {
             // Check what's being sent to GPU
             cout << "Grayscale frame first 20 pixels:\n";
