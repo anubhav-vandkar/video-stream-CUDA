@@ -125,19 +125,21 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
 
         if (rv > 0) {
             int n = recvfrom(sockfd, buf, sizeof(buf), 0, NULL, NULL);
-            deserializeHeader(ackhdr, buf);
-            uint32_t acknum = ackhdr.ack;
+            if (n >= 11) {
+                deserializeHeader(ackhdr, buf);
+                uint32_t acknum = ackhdr.ack;
+                cout << "Server received ACK=" << acknum << "\n";
 
-            // Slide window
-            while (base < total) {
-                uint32_t seg_seq = seqs[base];
-                uint32_t payload = (uint32_t)(segments[base].size() - 11);
+                // Slide window
+                while (base < total) {
+                    uint32_t seg_seq = seqs[base];
+                    uint32_t payload = (uint32_t)(segments[base].size() - 11);
 
-                if (acknum >= seg_seq + payload) {
-                    base++;
-                } else {
-                    break;
-                }
+                    if (acknum >= seg_seq + payload) {
+                        base++;
+                    } else {
+                        break;
+                    }
             }
 
             // Timer handling
@@ -207,6 +209,7 @@ void receiveFileData(int sockfd, sockaddr_in &sender, const char *outfile) {
             // In-order packet
             data.insert(data.end(), buf + 11, buf + 11 + hdr.length);
             expected_seq += hdr.length;
+            cout << "Received " << hdr.length << " bytes\n";  // <-- ADD THIS
         }
 
         // Send ACK for every packet
