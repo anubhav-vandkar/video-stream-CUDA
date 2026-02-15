@@ -128,9 +128,10 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
             if (n >= 11) {
                 deserializeHeader(ackhdr, buf);
                 uint32_t acknum = ackhdr.ack;
-                cout << "Server received ACK=" << acknum << "\n";
+                cout << "Server received ACK=" << acknum << " (base=" << base << ", next=" << next << ")\n";
 
                 // Slide window
+                int old_base = base;
                 while (base < total) {
                     uint32_t seg_seq = seqs[base];
                     uint32_t payload = (uint32_t)(segments[base].size() - 11);
@@ -140,6 +141,9 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
                     } else {
                         break;
                     }
+                }
+                if (base > old_base) {
+                    cout << "  Window advanced: base " << old_base << " -> " << base << "\n";
                 }
             }
 
