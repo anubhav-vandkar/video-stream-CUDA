@@ -88,7 +88,7 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
     int total = segments.size();
     int base = 0;
     int next = 0;
-    int WINDOW = 16; // increased window for higher latency/cloud networks
+    int WINDOW = 8; // increased window for higher latency/cloud networks
 
     char buf[1500];
     socklen_t dlen = sizeof(dest);
@@ -96,7 +96,7 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
 
     bool timer_running = false;
     auto timer_start = chrono::steady_clock::now();
-    const int TIMEOUT = 3000; // ms (increased for cloud latency)
+    const int TIMEOUT = 1500; // ms (increased for cloud latency)
 
     // Increase socket buffers to reduce drops on high-throughput links
     int sock_buf = 4 * 1024 * 1024; // 4MB
