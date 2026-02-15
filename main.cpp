@@ -116,10 +116,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    string video_path = string("../videos/input/") + argv[1];
-    const char* output_dir = "../videos/output_gpu/";
+    string video_path = string("../files/input/") + argv[1];
+    const char* output_dir = "../files/output_gpu/";
     
-    system("mkdir -p output_gpu");
+    system("mkdir -p ../files/output_gpu");
     
     cout << "Starting GPU video encoding..." << endl;
     cout << "Using LZ4 compression instead of RLE" << endl;

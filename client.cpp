@@ -4,12 +4,13 @@
 #include <unistd.h>
 #include <chrono>
 #include "utils/TCP_utils.hpp"
+#include "utils/udp_utils.hpp"
 #include <fstream>
 #include <vector>
 
 using namespace std;
 
-int main(int argc, char* argv[]){
+int notmain(int argc, char* argv[]){
 
     if (argc != 4) {
         cerr << "Usage: ./client <dest-ip> <remote-filename> <output-filename>\n";
@@ -107,4 +108,46 @@ int main(int argc, char* argv[]){
 
     close(client_fd);
     return 0;
+}
+
+int main(int argc, char* argv[]){
+    if (argc != 4) {
+        cerr << "Usage: ./client <dest-ip> <remote-filename> <output-filename>\n";
+        return 1;
+    }
+
+    const char *dest_ip = argv[1];
+    const char *remote_filename = argv[2];
+    const char *output_filename = argv[3];
+
+    using clock = chrono::steady_clock;
+
+    int client_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (client_fd < 0) {
+        cerr << "Socket creation failed\n";
+        return 1;
+    }
+
+    sockaddr_in dest{};
+    dest.sin_family = AF_INET;
+    dest.sin_port = htons(9000);
+    inet_pton(AF_INET, dest_ip, &dest.sin_addr);
+
+    char buf[150000];
+    socklen_t dlen = sizeof(dest);
+
+    sendRequest(client_fd, dest, remote_filename);
+
+    while (true) {
+        recvfrom(client_fd, buf, sizeof(buf), 0, NULL, NULL);
+        
+        FramePacket pkt;
+        deserializePacket(pkt, buf);
+        
+        if (pkt.type == END) {
+            break;
+        }
+        
+        // Process frame...
+    }
 }
