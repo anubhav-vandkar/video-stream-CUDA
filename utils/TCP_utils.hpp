@@ -140,6 +140,7 @@ void sendFileData(int sockfd, sockaddr_in &dest, const char *filename) {
                     } else {
                         break;
                     }
+                }
             }
 
             // Timer handling
