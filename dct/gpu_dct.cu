@@ -11,7 +11,7 @@ __global__ void int_to_float_kernel(const unsigned char* d_in, float* d_out, int
     int total = W * H;
     
     if (idx < total) {
-        d_out[idx] = (float)d_in[idx];
+        d_out[idx] = (float)d_in[idx] - 128.0f;
     }
 }
 

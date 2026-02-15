@@ -8,6 +8,12 @@
 #include "utils/TCP_utils.hpp"
 #include "utils/udp_utils.hpp"
 #include <thread>
+#include <opencv2/opencv.hpp>
+#include <cuda_runtime.h>
+#include <lz4.h>
+#include "cpu_utils.h"
+#include "dct/gpu_dct.h"
+#include "dct/gpu_quant.h"
 
 using namespace std;
 
@@ -245,7 +251,14 @@ int main(int argc, char *argv[]) {
         }
         file_check.close();
 
-        cout << "File found! Starting stream...\n";
+        cout << "File found!";
+
+        // Open video
+        cv::VideoCapture cap(full_path);
+        if (!cap.isOpened()) {
+            cerr << "Cannot open video\n";
+            continue;
+        }
 
         // ===== SEND DUMMY DATA FOR NOW =====
         uint32_t seq = 0;

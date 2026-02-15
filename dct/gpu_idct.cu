@@ -38,7 +38,8 @@ __global__ void idct_kernel(const float* d_in, unsigned char* d_out, int W, int 
         sum += COSINE_MATRIX[i * BLOCK_SIZE + ty] * temp[i][tx];
     }
     
-    float val = sum;
+    //float val = sum;
+    float val = sum + 128.0f;
     if (val < 0.0f) val = 0.0f;
     if (val > 255.0f) val = 255.0f;
     
