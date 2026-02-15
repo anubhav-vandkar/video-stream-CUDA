@@ -10,7 +10,7 @@
 
 using namespace std;
 
-#define QUANTIZATION 50
+#define QUANTIZATION 25
 
 void save_compressed_frame(const char* filename, const char* data, int size) {
     FILE* f = fopen(filename, "wb");
