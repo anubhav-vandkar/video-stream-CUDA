@@ -44,9 +44,28 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
     short* d_quantized;
     
     cudaMalloc(&d_frame_uint8, width * height);
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        cout << "Malloc d_frame_uint8 failed: " << cudaGetErrorString(err) << "\n";
+    }
+
     cudaMalloc(&d_frame_float, width * height * sizeof(float));
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        cout << "Malloc d_frame_float failed: " << cudaGetErrorString(err) << "\n";
+    }
+
     cudaMalloc(&d_dct, width * height * sizeof(float));
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        cout << "Malloc d_dct failed: " << cudaGetErrorString(err) << "\n";
+    }
+
     cudaMalloc(&d_quantized, width * height * sizeof(short));
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        cout << "Malloc d_quantized failed: " << cudaGetErrorString(err) << "\n";
+    }
     
     float cosine_matrix[64];
     compute_cosine_matrix(cosine_matrix);
@@ -64,6 +83,7 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
         cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
         
         cudaMemcpyAsync(d_frame_uint8, gray.data, width * height, cudaMemcpyHostToDevice, stream);
+        cudaStreamSynchronize(stream);  
         if (frame_count == 0) {
             // Check what's being sent to GPU
             cout << "Grayscale frame first 20 pixels:\n";
@@ -77,7 +97,7 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
             float* h_check = new float[width * height];
             
             // After uint8_to_float kernel, before DCT:
-            cudaMemcpy(h_check, d_frame_uint8, width * height * sizeof(float),
+            cudaMemcpy(h_check, d_frame_float, width * height * sizeof(float),
                     cudaMemcpyDeviceToHost);
             
             cout << "After uint8_to_float, first 20 values:\n";
