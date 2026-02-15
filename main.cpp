@@ -93,6 +93,11 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
         
         gpu_dct(d_frame_uint8, d_frame_float, d_dct, width, height, stream);
 
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            cout << "CUDA error: " << cudaGetErrorString(err) << "\n";
+        }
+
         if (frame_count == 0) {
             // Copy DCT coefficients back to CPU
             float* h_dct = new float[width * height];
