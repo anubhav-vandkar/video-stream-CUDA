@@ -67,13 +67,31 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
                        cudaMemcpyHostToDevice, stream);
         
         gpu_dct(d_frame_uint8, d_frame_float, d_dct, width, height, stream);
-        
+
+        if (frame_count == 0) {
+            // Copy DCT coefficients back to CPU
+            float* h_dct = new float[width * height];
+            cudaMemcpy(h_dct, d_dct, width * height * sizeof(float), 
+                    cudaMemcpyDeviceToHost);
+            
+            cout << "After DCT, first 20 coefficients:\n";
+            for (int i = 0; i < 20; i++) {
+                cout << h_dct[i] << " ";
+            }
+            cout << "\n";
+            
+            // Check range
+            float min_val = 1e9, max_val = -1e9;
+            for (int i = 0; i < width * height; i++) {
+                if (h_dct[i] < min_val) min_val = h_dct[i];
+                if (h_dct[i] > max_val) max_val = h_dct[i];
+            }
+            cout << "DCT range: [" << min_val << ", " << max_val << "]\n";
+            
+            delete[] h_dct;
+        }
+                
         gpu_quantize(d_dct, d_quantized, QUANTIZATION, width, height, stream);
-        
-        cudaMemcpyAsync(h_quantized, d_quantized, width * height * sizeof(short),
-                       cudaMemcpyDeviceToHost, stream);
-        
-        cudaStreamSynchronize(stream);
 
         if (frame_count == 0) {
             cout << "After GPU quantize, first 20 values:\n";
@@ -91,6 +109,11 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
             cout << "Quantized range: [" << min_val << ", " << max_val << "]\n";
         }
         
+        cudaMemcpyAsync(h_quantized, d_quantized, width * height * sizeof(short),
+                       cudaMemcpyDeviceToHost, stream);
+        
+        cudaStreamSynchronize(stream);
+
         int compressed_size = LZ4_compress_default(
             (const char*)h_quantized,
             lz4_buffer,
