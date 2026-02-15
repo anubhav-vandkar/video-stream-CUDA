@@ -63,9 +63,7 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
     while (cap.read(frame)) {
         cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
         
-        cudaMemcpyAsync(d_frame_uint8, gray.data, width * height,
-                       cudaMemcpyHostToDevice, stream);
-
+        cudaMemcpyAsync(d_frame_uint8, gray.data, width * height, cudaMemcpyHostToDevice, stream);
         if (frame_count == 0) {
             // Check what's being sent to GPU
             cout << "Grayscale frame first 20 pixels:\n";
@@ -79,7 +77,7 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
             float* h_check = new float[width * height];
             
             // After uint8_to_float kernel, before DCT:
-            cudaMemcpy(h_check, d_frame_float, width * height * sizeof(float),
+            cudaMemcpy(h_check, d_frame_uint8, width * height * sizeof(float),
                     cudaMemcpyDeviceToHost);
             
             cout << "After uint8_to_float, first 20 values:\n";
@@ -92,6 +90,7 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
         }
         
         gpu_dct(d_frame_uint8, d_frame_float, d_dct, width, height, stream);
+        cudaStreamSynchronize(stream);
 
         cudaError_t err = cudaGetLastError();
         if (err != cudaSuccess) {
@@ -122,7 +121,7 @@ void encode_video_gpu(const char* video_path, const char* output_dir) {
         }
                 
         gpu_quantize(d_dct, d_quantized, QUANTIZATION, width, height, stream);
-
+        cudaStreamSynchronize(stream);
         if (frame_count == 0) {
             cout << "After GPU quantize, first 20 values:\n";
             for (int i = 0; i < 20; i++) {
