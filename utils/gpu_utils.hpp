@@ -146,7 +146,7 @@ void encode_video_gpu(
 
     auto start = chrono::high_resolution_clock::now();
     
-    int seq = 0;
+    uint32_t seq = 0;
 
     cout << "Starting video encoding and streaming..." << endl;
     
@@ -164,7 +164,7 @@ void encode_video_gpu(
         cout << "Encoded frame " << seq << endl;
         
         // LZ4 compress
-        int compressed_size = LZ4_compress_default(
+        uint32_t compressed_size = LZ4_compress_default(
             (const char*)h_quantized, lz4_buffer,
             width * height * sizeof(short),
             LZ4_compressBound(width * height * sizeof(short))
