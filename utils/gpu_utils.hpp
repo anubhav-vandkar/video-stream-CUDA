@@ -7,7 +7,7 @@
 #include <arpa/inet.h>
 #include <thread>
 
-#include "cpu_utils.h"
+#include "utils/cpu_utils.hpp"
 #include "utils/udp_utils.hpp"
 #include "dct/gpu_dct.h"
 #include "dct/gpu_idct.h"
