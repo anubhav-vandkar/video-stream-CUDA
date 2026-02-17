@@ -152,8 +152,6 @@ void encode_video_gpu(
     
     while (cap.read(frame)) {
         cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
-
-        cout << "Encoding frame " << seq << "..." << endl;
         
         // GPU encode
         cudaMemcpy(d_frame_uint8, gray.data, width * height, cudaMemcpyHostToDevice);
@@ -162,6 +160,8 @@ void encode_video_gpu(
         cudaStreamSynchronize(stream);
         
         cudaMemcpy(h_quantized, d_quantized, width * height * sizeof(short), cudaMemcpyDeviceToHost);
+
+        cout << "Encoded frame " << seq << endl;
         
         // LZ4 compress
         int compressed_size = LZ4_compress_default(
@@ -170,6 +170,8 @@ void encode_video_gpu(
             LZ4_compressBound(width * height * sizeof(short))
         );
         
+        cout << "Sending frame " << seq << " (compressed size: " << compressed_size << " bytes)" << endl;
+
         // SEND
         sendFrame(sockfd, client_addr, lz4_buffer, compressed_size, seq);
         
