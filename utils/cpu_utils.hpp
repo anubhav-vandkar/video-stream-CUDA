@@ -6,11 +6,6 @@
 
 #define BLOCK_SIZE 8
 
-#define WIDTH 1920
-#define HEIGHT 1080
-
-#define FPS 60
-
 void compute_cosine_matrix(float* matrix) {
     const float pi = 3.14159265358979323846f;
     const float factor = pi / (2.0f * BLOCK_SIZE);
