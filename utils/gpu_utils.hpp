@@ -7,11 +7,11 @@
 #include <arpa/inet.h>
 #include <thread>
 
-#include "utils/cpu_utils.hpp"
-#include "utils/udp_utils.hpp"
-#include "dct/gpu_dct.h"
-#include "dct/gpu_idct.h"
-#include "dct/gpu_quant.h"
+#include "cpu_utils.hpp"
+#include "udp_utils.hpp"
+#include "../dct/gpu_dct.h"
+#include "../dct/gpu_idct.h"
+#include "../dct/gpu_quant.h"
 
 using namespace std;
 
