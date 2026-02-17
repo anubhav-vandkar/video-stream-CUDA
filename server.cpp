@@ -5,6 +5,7 @@
 #include <opencv2/opencv.hpp>
 #include <arpa/inet.h>
 #include <thread>
+#include <unistd.h>
 
 #include "utils/udp_utils.hpp"
 #include "utils/gpu_utils.hpp"
