@@ -73,9 +73,9 @@ void sendFrame(int sock_fd, sockaddr_in &dest, const char *gpudata, uint32_t len
     
     size_t packet_size = 9 + pkt.length;
 
-    cout << "Sending frame " << seq << " (packet size: " << packet_size << " bytes)" << endl;
+    std::cout << "Sending frame " << seq << " (packet size: " << packet_size << " bytes)" << std::endl;
     sendto(sock_fd, &pkt, packet_size, 0, (sockaddr*)&dest, sizeof(dest));
-    cout << "Sent frame " << seq << endl;
+    std::cout << "Sent frame " << seq << std::endl;
 }
 
 void sendStreamEnd(int sock_fd, sockaddr_in &dest, uint32_t seq) {
