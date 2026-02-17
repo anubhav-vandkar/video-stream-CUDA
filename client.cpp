@@ -16,19 +16,20 @@
 
 using namespace std;
 
-#define WIDTH 1920
-#define HEIGHT 1080
 #define Q 50
 
 int main(int argc, char* argv[]){
-    if (argc != 4) {
-        cerr << "Usage: ./client <dest-ip> <remote-filename> <output-filename>\n";
+    if (argc != 6) {
+        cerr << "Usage: ./client <dest-ip> <remote-filename> <output-filename> <width> <height>\n";
         return 1;
     }
 
     const char *dest_ip = argv[1];
     const char *remote_filename = argv[2];
     const char *output_filename = argv[3];
+
+    const int width = atoi(argv[4]);
+    const int height = atoi(argv[5]);
 
     using clock = chrono::steady_clock;
 
@@ -63,7 +64,7 @@ int main(int argc, char* argv[]){
         output_filename,
         cv::VideoWriter::fourcc('m','p','4','v'),
         30,
-        cv::Size(WIDTH, HEIGHT),
+        cv::Size(width, height),
         false
     );
 
@@ -90,25 +91,25 @@ int main(int argc, char* argv[]){
             break;
         }
         
-        short* quantized = new short[WIDTH * HEIGHT];
+        short* quantized = new short[width * height];
         LZ4_decompress_safe(
             (char*)pkt.data,
             (char*)quantized,
             pkt.length,
-            WIDTH * HEIGHT * sizeof(short)
+            width * height * sizeof(short)
         );
         
         // CPU IDCT
-        uint8_t* pixels = cpu_idct_frame(quantized, WIDTH, HEIGHT, Q);
+        uint8_t* pixels = cpu_idct_frame(quantized, width, height, Q);
         
         // Send to ffplay (live playback)
         if (ffplay) {
-            fwrite(pixels, 1, WIDTH * HEIGHT, ffplay);
+            fwrite(pixels, 1, width * height, ffplay);
             fflush(ffplay);
         }
         
         // Save to file
-        cv::Mat frame(HEIGHT, WIDTH, CV_8UC1, pixels);
+        cv::Mat frame(height, width, CV_8UC1, pixels);
         writer.write(frame);
         
         delete[] quantized;
