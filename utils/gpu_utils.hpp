@@ -8,10 +8,10 @@
 #include <thread>
 
 #include "cpu_utils.h"
-#include "udp_utils.hpp"
-#include "gpu_dct.h"
-#include "gpu_idct.h"
-#include "gpu_quant.h"
+#include "utils/udp_utils.hpp"
+#include "dct/gpu_dct.h"
+#include "dct/gpu_idct.h"
+#include "dct/gpu_quant.h"
 
 using namespace std;
 

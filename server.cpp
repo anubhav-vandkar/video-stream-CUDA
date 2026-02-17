@@ -6,9 +6,8 @@
 #include <arpa/inet.h>
 #include <thread>
 
-#include "TCP_utils.hpp"
-#include "udp_utils.hpp"
-#include "gpu_utils.hpp"
+#include "utils/udp_utils.hpp"
+#include "utils/gpu_utils.hpp"
 
 using ms = chrono::milliseconds;
 

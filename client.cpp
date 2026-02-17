@@ -10,9 +10,8 @@
 #include <lz4.h>
 #include <libavformat/avformat.h>
 
-#include "TCP_utils.hpp"
-#include "udp_utils.hpp"
-#include "cpu_utils.hpp"
+#include "utils/udp_utils.hpp"
+#include "utils/cpu_utils.hpp"
 
 using namespace std;
 
