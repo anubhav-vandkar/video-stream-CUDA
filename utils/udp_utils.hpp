@@ -1,4 +1,3 @@
-#pragma once
 #include <cstdint>
 #include <arpa/inet.h>
 #include <cstring>
@@ -6,8 +5,6 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-
-using namespace std;
 
 const int WIDTH = 1920;
 const int HEIGHT = 1080;
@@ -24,7 +21,6 @@ struct FramePacket {
     uint32_t length;
     char data[100000];
 };
-
 
 inline void serializePacket(const FramePacket &pkt, char *buf) {
     uint32_t seq_n = htonl(pkt.seq);
@@ -64,7 +60,7 @@ void sendRequest(int sock_fd, sockaddr_in &dest, const char* filename) {
     size_t packet_size = 9 + pkt.length;
     sendto(sock_fd, buffer, packet_size, 0, (sockaddr*)&dest, sizeof(dest));
     
-    cout << "Sent request for: " << filename << endl;
+    std::cout << "Sent request for: " << filename << std::endl;
 }
 
 void sendFrame(int sock_fd, sockaddr_in &dest, const char *gpudata, uint32_t length, uint32_t seq) {

@@ -3,112 +3,22 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <chrono>
-#include "utils/TCP_utils.hpp"
-#include "utils/udp_utils.hpp"
 #include <fstream>
 #include <vector>
+#include <map>
+#include <opencv2/opencv.hpp>
+#include <lz4.h>
+#include <libavformat/avformat.h>
+
+#include "TCP_utils.hpp"
+#include "udp_utils.hpp"
+#include "cpu_utils.hpp"
 
 using namespace std;
 
-int notmain(int argc, char* argv[]){
-
-    if (argc != 4) {
-        cerr << "Usage: ./client <dest-ip> <remote-filename> <output-filename>\n";
-        return 1;
-    }
-
-    const char *dest_ip = argv[1];
-    const char *remote_filename = argv[2];
-    const char *output_filename = argv[3];
-
-    using clock = chrono::steady_clock;
-
-    int client_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (client_fd < 0) {
-        cerr << "Socket creation failed\n";
-        return 1;
-    }
-
-    sockaddr_in dest{};
-    dest.sin_family = AF_INET;
-    dest.sin_port = htons(9000);
-    inet_pton(AF_INET, dest_ip, &dest.sin_addr);
-
-    char buf[1500];
-    socklen_t dlen = sizeof(dest);
-    TCPHeader hdr;
-
-    // Send SYN
-    TCPHeader syn{};
-    syn.seq = 1;
-    syn.ack = 0;
-    syn.flags = SYN;
-    syn.length = 0;
-
-    serializeHeader(syn, buf);
-    sendto(client_fd, buf, 11, 0, (sockaddr*)&dest, dlen);
-    cout << "Client: Sent SYN\n";
-
-    // Wait for SYN-ACK
-    auto last = clock::now();
-    while (true) {
-        fd_set fds;
-        FD_ZERO(&fds);
-        FD_SET(client_fd, &fds);
-
-        timeval tv{0, 200000}; // 200ms
-        int rv = select(client_fd+1, &fds, NULL, NULL, &tv);
-
-        if (rv > 0) {
-            int n = recvfrom(client_fd, buf, sizeof(buf), 0, (sockaddr*)&dest, &dlen);
-            if (n < 11) continue;
-            
-            deserializeHeader(hdr, buf);
-
-            if ((hdr.flags & SYN) && (hdr.flags & ACK)) {
-                cout << "Client: Received SYN-ACK\n";
-                break;
-            }
-        }
-
-        auto now = clock::now();
-        if (chrono::duration_cast<ms>(now - last).count() > 1500) {
-            cout << "Client: Timeout — resending SYN\n";
-            serializeHeader(syn, buf);
-            sendto(client_fd, buf, 11, 0, (sockaddr*)&dest, dlen);
-            last = clock::now();
-        }
-    }
-
-    // Send final ACK
-    TCPHeader ack{};
-    ack.seq = hdr.ack;
-    ack.ack = hdr.seq + 1;
-    ack.flags = ACK;
-    ack.length = 0;
-
-    serializeHeader(ack, buf);
-    sendto(client_fd, buf, 11, 0, (sockaddr*)&dest, dlen);
-    cout << "Client: Connection established!\n";
-
-    // SEND FILENAME REQUEST
-    TCPHeader req{};
-    req.seq = hdr.ack;
-    req.ack = hdr.seq + 1;
-    req.flags = 0; // Data packet
-    req.length = strlen(remote_filename);
-
-    serializeHeader(req, buf);
-    memcpy(buf + 11, remote_filename, strlen(remote_filename));
-    sendto(client_fd, buf, 11 + strlen(remote_filename), 0, (sockaddr*)&dest, dlen);
-    cout << "Client: Sent filename request: " << remote_filename << "\n";
-
-    // RECEIVE FILE DATA
-    receiveFileData(client_fd, dest, output_filename);
-
-    close(client_fd);
-    return 0;
-}
+#define WIDTH 1920
+#define HEIGHT 1080
+#define Q 50
 
 int main(int argc, char* argv[]){
     if (argc != 4) {
@@ -138,16 +48,85 @@ int main(int argc, char* argv[]){
 
     sendRequest(client_fd, dest, remote_filename);
 
+    FILE* ffplay = popen(
+        "ffplay -f rawvideo -pixel_format gray -video_size 1920x1080 "
+        "-framerate 30 -i - 2>/dev/null",
+        "w"
+    );
+
+    if (!ffplay) {
+        cerr << "Warning: ffplay not available. Saving to file only.\n";
+    }
+
+    // Open video writer for saving
+    cv::VideoWriter writer(
+        output_filename,
+        cv::VideoWriter::fourcc('m','p','4','v'),
+        30,
+        cv::Size(WIDTH, HEIGHT),
+        false
+    );
+
+    cout << "Receiving and decoding video...\n";
+    if (ffplay) cout << "Live playback started in ffplay window\n";
+
+    cout<< "Waiting for video stream...\n";
+    ofstream outfile(output_filename, ios::binary);
+
+    uint32_t next_to_decode = 0;
+    uint32_t frames_received = 0;
+
+    map<uint32_t, vector<uint8_t>> recv_buffer;
+
     while (true) {
-        recvfrom(client_fd, buf, sizeof(buf), 0, NULL, NULL);
+        int n = recvfrom(client_fd, buf, sizeof(buf), 0, NULL, NULL);
+        if (n < 9) continue;
         
         FramePacket pkt;
         deserializePacket(pkt, buf);
         
         if (pkt.type == END) {
+            cout << "Received end of stream packet\n";
             break;
         }
         
-        // Process frame...
+        short* quantized = new short[WIDTH * HEIGHT];
+        LZ4_decompress_safe(
+            (char*)pkt.data,
+            (char*)quantized,
+            pkt.length,
+            WIDTH * HEIGHT * sizeof(short)
+        );
+        
+        // CPU IDCT
+        uint8_t* pixels = cpu_idct_frame(quantized, WIDTH, HEIGHT, Q);
+        
+        // Send to ffplay (live playback)
+        if (ffplay) {
+            fwrite(pixels, 1, WIDTH * HEIGHT, ffplay);
+            fflush(ffplay);
+        }
+        
+        // Save to file
+        cv::Mat frame(HEIGHT, WIDTH, CV_8UC1, pixels);
+        writer.write(frame);
+        
+        delete[] quantized;
+        delete[] pixels;
+        
+        frames_received++;
+        
+        if (frames_received % 100 == 0) {
+            cout << "\rDecoded " << frames_received << " frames..." << flush;
+        }
     }
+
+    if (ffplay) pclose(ffplay);
+    writer.release();
+    close(client_fd);
+
+    cout << "\n\nTotal frames: " << frames_received << "\n";
+    cout << "Video saved to: " << output_filename << "\n";
+    
+    return 0;
 }
