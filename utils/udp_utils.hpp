@@ -64,6 +64,8 @@ void sendRequest(int sock_fd, sockaddr_in &dest, const char* filename) {
 }
 
 void sendFrame(int sock_fd, sockaddr_in &dest, const char *gpudata, uint32_t length, uint32_t seq) {
+
+    std::cout << "Preparing to send frame " << seq << " (size: " << length << " bytes)" << std::endl;
     
     FramePacket pkt{};
     pkt.seq = seq;
