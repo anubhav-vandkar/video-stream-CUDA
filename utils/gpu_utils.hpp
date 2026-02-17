@@ -152,6 +152,8 @@ void encode_video_gpu(
     
     while (cap.read(frame)) {
         cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+
+        cout << "Encoding frame " << seq << "..." << endl;
         
         // GPU encode
         cudaMemcpy(d_frame_uint8, gray.data, width * height, cudaMemcpyHostToDevice);
