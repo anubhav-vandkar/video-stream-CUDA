@@ -133,10 +133,13 @@ void encode_video_gpu(
     cudaMalloc(&d_dct, width * height * sizeof(float));
     cudaMalloc(&d_quantized, width * height * sizeof(short));
     
+    cout<< "GPU memory allocated" << endl;
     // Load DCT matrix
     float cosine_matrix[64];
     compute_cosine_matrix(cosine_matrix);
     load_cosine_matrix(cosine_matrix);
+
+    cout << "cosine matrix loaded to GPU" << endl;
     
     short* h_quantized = new short[width * height];
     char* lz4_buffer = new char[LZ4_compressBound(width * height * sizeof(short))];
@@ -144,6 +147,8 @@ void encode_video_gpu(
     auto start = chrono::high_resolution_clock::now();
     
     int seq = 0;
+
+    cout << "Starting video encoding and streaming..." << endl;
     
     while (cap.read(frame)) {
         cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
@@ -167,12 +172,15 @@ void encode_video_gpu(
         sendFrame(sockfd, client_addr, lz4_buffer, compressed_size, seq);
         
         seq++;
+        cout << "Encoded and sent frame " << seq << " (compressed size: " << compressed_size << " bytes)" << endl;
         
         // Rate limit
         usleep(16500);  // 60 FPS
     }
 
     sendStreamEnd(sockfd, client_addr, seq);
+
+    cout << "Finished encoding and streaming video." << endl;
     
     auto end = chrono::high_resolution_clock::now();
     chrono::duration<double> elapsed = end - start;

@@ -8,7 +8,6 @@
 #include <map>
 #include <opencv2/opencv.hpp>
 #include <lz4.h>
-#include <libavformat/avformat.h>
 
 #include "utils/udp_utils.hpp"
 #include "utils/cpu_utils.hpp"
@@ -49,8 +48,8 @@ int main(int argc, char* argv[]){
     sendRequest(client_fd, dest, remote_filename);
 
     FILE* ffplay = popen(
-        "ffplay -f rawvideo -pixel_format gray -video_size 1920x1080 "
-        "-framerate 30 -i - 2>/dev/null",
+        ("ffplay -f rawvideo -pixel_format gray -video_size " + to_string(width) + "x" + to_string(height) + " "
+        "-framerate 30 -i - 2>/dev/null").c_str(),
         "w"
     );
 

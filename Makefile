@@ -8,9 +8,8 @@ server: dct/gpu_dct.o dct/gpu_quant.o dct/gpu_idct.o server.cpp
 	nvcc $(NVCC_FLAGS) dct/gpu_dct.o dct/gpu_quant.o dct/gpu_idct.o server.cpp -o server \
 	    $(OPENCV_INCLUDE) $(OPENCV_LIBS) -llz4
 
-client: dct/gpu_dct.o dct/gpu_quant.o dct/gpu_idct.o client.cpp
-	nvcc $(NVCC_FLAGS) dct/gpu_dct.o dct/gpu_quant.o dct/gpu_idct.o client.cpp -o client \
-	    $(OPENCV_INCLUDE) $(OPENCV_LIBS) -llz4
+client: 
+	g++ client.cpp -o client $(OPENCV_INCLUDE) $(OPENCV_LIBS) -llz4
 
 dct/gpu_dct.o: dct/gpu_dct.cu dct/gpu_dct.h
 	nvcc $(NVCC_FLAGS) -c dct/gpu_dct.cu -o dct/gpu_dct.o $(OPENCV_INCLUDE)

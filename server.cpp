@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    std::cout << "Server listening on port 9000" << endl;
+    cout << "Server listening on port 9000" << endl;
 
     uint8_t buffer[150000];
     FramePacket pkt;
@@ -50,23 +50,23 @@ int main(int argc, char *argv[]) {
     socklen_t slen = sizeof(client);
 
     while (true) {
-        std::cout << "Waiting for client request...\n";
+        cout << "Waiting for client request...\n";
 
         // Receive REQUEST
         int n = recvfrom(server_fd, buffer, sizeof(buffer), 0, (sockaddr*)&client, &slen);
         
-        std::cout << "Received packet of size " << n << " bytes\n";
+        cout << "Received packet of size " << n << " bytes\n";
         
         if (n < 12) continue;  // Too small, ignore
         
         deserializePacket(pkt, (char*)buffer);
 
-        std::cout << "Received packet with seq=" << pkt.seq 
+        cout << "Received packet with seq=" << pkt.seq 
              << ", type=" << (int)pkt.type 
              << ", length=" << pkt.length << "\n";
 
         if (pkt.type != REQUEST) {
-            std::cout << "Expected REQUEST packet, got type " << (int)pkt.type << "\n";
+            cout << "Expected REQUEST packet, got type " << (int)pkt.type << "\n";
             continue;
         }
 
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
         memcpy(requested_file, pkt.data, pkt.length);
         requested_file[pkt.length] = '\0';
         
-        std::cout << "Client requested: " << requested_file << "\n";
+        cout << "Client requested: " << requested_file << "\n";
 
         // Check if file exists
         string full_path = file_dir + requested_file;
@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
         }
         file_check.close();
 
-        std::cout << "File found!";
+        cout << "File found!";
 
         // Open video
         cv::VideoCapture cap(full_path);
@@ -98,6 +98,8 @@ int main(int argc, char *argv[]) {
 
         uint32_t seq = 0;
 
+        cout<< "Starting video encoding and streaming...\n";
+
         encode_video_gpu(full_path.c_str(), server_fd, client);
 
         // for(size_t i = 0; i < frames.size(); i++) {
@@ -105,7 +107,7 @@ int main(int argc, char *argv[]) {
         //     uint32_t frame_size = 100000; // TODO: Pass actual size from encode_video_gpu
 
         //     sendFrame(server_fd, client, frame_data, frame_size, seq++);
-        //     std::cout << "Sent frame " << i << " with seq " << (seq-1) << "\n";
+        //     cout << "Sent frame " << i << " with seq " << (seq-1) << "\n";
 
         //     // Rate limit to ~30 FPS
         //     this_thread::sleep_for(chrono::milliseconds(33));
@@ -113,7 +115,7 @@ int main(int argc, char *argv[]) {
 
         // sendStreamEnd(server_fd, client, seq);
         
-        std::cout << "Stream complete!\n\n";
+        cout << "Stream complete!\n\n";
     }
 
     close(server_fd);
