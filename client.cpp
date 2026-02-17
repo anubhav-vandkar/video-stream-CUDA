@@ -16,6 +16,12 @@ using namespace std;
 
 #define Q 50
 
+// FRAGMENTATION IMPLEMENTATION
+// frame_id, chunk_id, data
+map<uint32_t, map<uint32_t, vector<uint8_t>>> chunk_buffer;
+// frame_id, total_chunks
+map<uint32_t, uint32_t> frame_total_chunks;
+
 int main(int argc, char* argv[]){
     if (argc != 6) {
         cerr << "Usage: ./client <dest-ip> <remote-filename> <output-filename> <width> <height>\n";
@@ -88,19 +94,35 @@ int main(int argc, char* argv[]){
             cout << "Received end of stream packet\n";
             break;
         }
+
+        // FRAGMENTATION REASSEMBLY
+        if (chunk_buffer[pkt.seq].size() != frame_total_chunks[pkt.seq])
+            continue;
+
+        vector<uint8_t> full_frame;
+        for (uint32_t i = 0; i < pkt.chunk_total; i++) {
+            auto& chunk = chunk_buffer[pkt.seq][i];
+            full_frame.insert(full_frame.end(), chunk.begin(), chunk.end());
+        }
         
         short* quantized = new short[width * height];
-        LZ4_decompress_safe(
+        int result = LZ4_decompress_safe(
             (char*)pkt.data,
             (char*)quantized,
             pkt.length,
             width * height * sizeof(short)
         );
+
+        if(result < 0){
+            cerr << "LZ4 decompression failed for frame " << pkt.seq << endl;
+            delete[] quantized;
+            continue;
+        }
         
         // CPU IDCT
         uint8_t* pixels = cpu_idct_frame(quantized, width, height, Q);
         
-        // Send to ffplay (live playback)
+        // Live playback
         if (ffplay) {
             fwrite(pixels, 1, width * height, ffplay);
             fflush(ffplay);
@@ -112,11 +134,14 @@ int main(int argc, char* argv[]){
         
         delete[] quantized;
         delete[] pixels;
+
+        chunk_buffer.erase(pkt.seq);
+        frame_total_chunks.erase(pkt.seq);
         
         frames_received++;
         
         if (frames_received % 100 == 0) {
-            cout << "\rDecoded " << frames_received << " frames..." << flush;
+            cout << "Decoded " << frames_received << " frames..." << endl;
         }
     }
 
@@ -124,8 +149,8 @@ int main(int argc, char* argv[]){
     writer.release();
     close(client_fd);
 
-    cout << "\n\nTotal frames: " << frames_received << "\n";
-    cout << "Video saved to: " << output_filename << "\n";
+    cout << "Total frames: " << frames_received << endl;
+    cout << "Video saved to: " << output_filename << endl;
     
     return 0;
 }
