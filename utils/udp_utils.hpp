@@ -1,3 +1,6 @@
+#ifndef UDP_UTILS_H
+#define UDP_UTILS_H
+
 #include <cstdint>
 #include <arpa/inet.h>
 #include <cstring>
@@ -5,9 +8,6 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-
-const int WIDTH = 1920;
-const int HEIGHT = 1080;
 
 enum FrameType : uint8_t {
     REQUEST = 0x01,
@@ -85,3 +85,4 @@ void sendStreamEnd(int sock_fd, sockaddr_in &dest, uint32_t seq) {
     size_t packet_size = 9;
     sendto(sock_fd, &pkt, packet_size, 0, (sockaddr*)&dest, sizeof(dest));
 }
+#endif //UDP_UTILS_H

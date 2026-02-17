@@ -1,3 +1,6 @@
+#ifndef GPU_UTILS_H
+#define GPU_UTILS_H
+
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <cuda_runtime.h>
@@ -185,3 +188,5 @@ void encode_video_gpu(
     cap.release();
     
 }
+
+#endif //GPU_UTILS_H
