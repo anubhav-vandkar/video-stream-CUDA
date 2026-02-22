@@ -1,4 +1,5 @@
 OPENCV_INCLUDE = -I/usr/include/opencv4
+CUDA_INCLUDE = -I/usr/local/cuda-12.6/bin/nvcc
 OPENCV_LIBS = -lopencv_core -lopencv_videoio -lopencv_imgproc -lopencv_imgcodecs
 NVCC_FLAGS = -arch=sm_75
 CXX_FLAGS = -std=c++17 -O3 -mavx2 -mfma
@@ -6,11 +7,12 @@ CXX_FLAGS = -std=c++17 -O3 -mavx2 -mfma
 all: server client
 
 server.o: server.cpp
-	g++ $(CXX_FLAGS) -c server.cpp -o server.o $(OPENCV_INCLUDE)
+	g++ $(CXX_FLAGS) -c server.cpp -o server.o \
+	    $(OPENCV_INCLUDE) $(CUDA_INCLUDE)
 
 server: dct/gpu_dct.o dct/gpu_quant.o dct/gpu_idct.o server.o
 	nvcc $(NVCC_FLAGS) dct/gpu_dct.o dct/gpu_quant.o dct/gpu_idct.o server.o -o server \
-	    $(OPENCV_LIBS) -llz4
+	    $(OPENCV_LIBS) -llz4 -L/usr/local/cuda/lib64 -lcudart
 
 client: client.cpp
 	g++ $(CXX_FLAGS) client.cpp -o client \
