@@ -5,7 +5,7 @@ NVCC_FLAGS = -arch=sm_75
 all: server client
 
 server: dct/gpu_dct.o dct/gpu_quant.o dct/gpu_idct.o server.cpp
-	nvcc -O3 -mavx2 -mfma $(NVCC_FLAGS) dct/gpu_dct.o dct/gpu_quant.o dct/gpu_idct.o server.cpp -o server.o \
+	nvcc -O3 -Xcompiler -mavx2 $(NVCC_FLAGS) dct/gpu_dct.o dct/gpu_quant.o dct/gpu_idct.o server.cpp -o server.o \
 	    $(OPENCV_INCLUDE) $(OPENCV_LIBS) -llz4
 
 client: 
