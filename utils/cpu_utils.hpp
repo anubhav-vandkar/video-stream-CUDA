@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <immintrin.h>
 
-//Everything hardcoded to 8 due to AVX 
+//Everything hardcoded to 8 due to AVX 256
 
 void compute_cosine_matrix(float* matrix) {
     const float pi = 3.14159265358979323846f;
@@ -55,7 +55,7 @@ void cpu_dequantize(const short* quantized, float* dct, int size, int Q) {
     }
 }
 
-void idct_8x8(const float* dct_block, float* output_block, const float* cosine_matrix) {
+void cpu_idct(const float* dct_block, float* output_block, const float* cosine_matrix) {
     float temp[64];
     
     for (int i = 0; i < 8; i++) {
@@ -147,7 +147,7 @@ uint8_t* cpu_idct_frame(const short* quantized, int width, int height, int Q) {
             }
             
             // IDCT
-            idct_8x8(dct_block, output_block, cosine_matrix);
+            cpu_idct(dct_block, output_block, cosine_matrix);
             
             // Store pixels
             store_block(output_block, pixels, bx, by, width);

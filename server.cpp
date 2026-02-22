@@ -101,19 +101,6 @@ int main(int argc, char *argv[]) {
         cout<< "Starting video encoding and streaming...\n";
 
         encode_video_gpu(full_path.c_str(), server_fd, client);
-
-        // for(size_t i = 0; i < frames.size(); i++) {
-        //     char* frame_data = (char*)frames[i];
-        //     uint32_t frame_size = 100000; // TODO: Pass actual size from encode_video_gpu
-
-        //     sendFrame(server_fd, client, frame_data, frame_size, seq++);
-        //     cout << "Sent frame " << i << " with seq " << (seq-1) << "\n";
-
-        //     // Rate limit to ~30 FPS
-        //     this_thread::sleep_for(chrono::milliseconds(33));
-        // }
-
-        // sendStreamEnd(server_fd, client, seq);
         
         cout << "Stream complete!\n\n";
     }
