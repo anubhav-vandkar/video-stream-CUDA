@@ -96,14 +96,27 @@ int main(int argc, char* argv[]){
         }
 
         // FRAGMENTATION REASSEMBLY
+        chunk_buffer[pkt.seq][pkt.chunk_id] = 
+        vector<uint8_t>(pkt.data, pkt.data + pkt.length);
+        frame_total_chunks[pkt.seq] = pkt.chunk_total;
+
         if (chunk_buffer[pkt.seq].size() != frame_total_chunks[pkt.seq])
             continue;
+
+        cout << "Frame " << pkt.seq << " chunks stored: ";
+        for (auto& [chunk_id, data] : chunk_buffer[pkt.seq]) {
+            cout << chunk_id << "(" << data.size() << "B) ";
+        }
+        cout << "\n";
 
         vector<uint8_t> full_frame;
         for (uint32_t i = 0; i < pkt.chunk_total; i++) {
             auto& chunk = chunk_buffer[pkt.seq][i];
             full_frame.insert(full_frame.end(), chunk.begin(), chunk.end());
         }
+
+        cout << "Frame " << pkt.seq << ": reassembled " << full_frame.size() 
+        << " bytes from " << pkt.chunk_total << " chunks\n";
         
         short* quantized = new short[width * height];
         int result = LZ4_decompress_safe(
