@@ -1,5 +1,5 @@
 OPENCV_INCLUDE = -I/usr/include/opencv4
-CUDA_INCLUDE = -I/usr/local/cuda-12.6/bin/nvcc
+CUDA_INCLUDE = -I/usr/local/cuda/include
 OPENCV_LIBS = -lopencv_core -lopencv_videoio -lopencv_imgproc -lopencv_imgcodecs
 NVCC_FLAGS = -arch=sm_75
 CXX_FLAGS = -std=c++17 -O3 -mavx2 -mfma
