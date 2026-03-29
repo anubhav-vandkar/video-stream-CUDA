@@ -1,5 +1,5 @@
-#ifndef SHARED_QUEUE_HPP
-#define SHARED_QUEUE_HPP
+#ifndef RECV_QUEUE_HPP
+#define RECV_QUEUE_HPP
 
 #include <queue>
 #include <mutex>
@@ -18,8 +18,8 @@ struct CompressedFrame {
 // Shared queue between receiver and decoder
 class FrameQueue {
 private:
-    queue<CompressedFrame> queue;
-    mutex mutex;
+    queue<CompressedFrame> frame_queue;
+    mutex frame_queue_mutex;
     condition_variable cv;
     bool done;
     size_t max_size;
@@ -30,35 +30,35 @@ public:
     
     // Producer
     void push(CompressedFrame&& frame) {
-        unique_lock<std::mutex> lock(mutex);
+        unique_lock<mutex> lock(frame_queue_mutex);
         
         // Wait if queue full
         cv.wait(lock, [this]{ 
-            return queue.size() < max_size || done; 
+            return frame_queue.size() < max_size || done; 
         });
         
         if (!done) {
-            queue.push(move(frame));
+            frame_queue.push(move(frame));
             cv.notify_one();  // Wake consumer
         }
     }
     
     // Consumer 
     bool pop(CompressedFrame& frame) {
-        unique_lock<std::mutex> lock(mutex);
+        unique_lock<mutex> lock(frame_queue_mutex);
         
         // Wait for data or done signal
         cv.wait(lock, [this]{ 
-            return !queue.empty() || done; 
+            return !frame_queue.empty() || done; 
         });
         
         // Check if actually done and empty
-        if (done && queue.empty()) {
+        if (done && frame_queue.empty()) {
             return false;
         }
         
-        frame = move(queue.front());
-        queue.pop();
+        frame = move(frame_queue.front());
+        frame_queue.pop();
         
         cv.notify_one();
         return true;
@@ -66,16 +66,16 @@ public:
     
     // Signal no more frames coming
     void set_done() {
-        unique_lock<std::mutex> lock(mutex);
+        unique_lock<mutex> lock(frame_queue_mutex);
         done = true;
         cv.notify_all();
     }
     
     // Get current size (for stats)
     size_t size() {
-        unique_lock<std::mutex> lock(mutex);
-        return queue.size();
+        unique_lock<mutex> lock(frame_queue_mutex);
+        return frame_queue.size();
     }
 };
 
-#endif // SHARED_QUEUE_HPP
+#endif // RECV_QUEUE_HPP

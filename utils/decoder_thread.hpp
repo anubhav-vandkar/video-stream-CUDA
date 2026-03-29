@@ -5,8 +5,8 @@
 #include <opencv2/opencv.hpp>
 #include <lz4.h>
 #include "recv_thread.hpp"
-#include "utils/cpu_utils.hpp"
-#include "config.hpp"
+#include "cpu_utils.hpp"
+#include "../config.hpp"
 
 using namespace std;
 

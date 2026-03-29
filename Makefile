@@ -31,7 +31,7 @@ server_cpu: server.cpp
 	    $(OPENCV_INCLUDE) $(OPENCV_LIBS) -llz4
 	@echo "CPU server built as 'server'"
 
-client: client.cpp recv_queue.hpp recv_thread.hpp decoder_thread.hpp
+client: client.cpp utils/recv_queue.hpp utils/recv_thread.hpp utils/decoder_thread.hpp
 	g++ $(CXX_FLAGS) client.cpp -o client \
 	    $(OPENCV_INCLUDE) $(OPENCV_LIBS) -llz4
 
