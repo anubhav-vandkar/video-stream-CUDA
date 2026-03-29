@@ -99,8 +99,8 @@ int main(int argc, char* argv[]){
             compressed_frame.insert(compressed_frame.end(), chunk.begin(), chunk.end());
         }
 
-        cout << "Frame " << pkt.seq << ": reassembled " << compressed_frame.size()
-             << " bytes from " << pkt.chunk_total << " chunk(s)\n";
+        // cout << "Frame " << pkt.seq << ": reassembled " << compressed_frame.size()
+        //      << " bytes from " << pkt.chunk_total << " chunk(s)\n";
 
         const int decompressed_size = width * height * sizeof(short);
         vector<short> quantized(width * height);
@@ -140,8 +140,8 @@ int main(int argc, char* argv[]){
         frame_total_chunks.erase(pkt.seq);
 
         frames_received++;
-        if (frames_received % 100 == 0)
-            cout << "Decoded " << frames_received << " frames...\n";
+        // if (frames_received % 100 == 0)
+        //     cout << "Decoded " << frames_received << " frames...\n";
     }
 
     if (ffplay) pclose(ffplay);
