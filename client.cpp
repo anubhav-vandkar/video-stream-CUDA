@@ -10,6 +10,10 @@
 #include "utils/udp_utils.hpp"
 #include "utils/cpu_utils.hpp"
 #include "config.hpp"
+#include "recv_queue.hpp"
+#include "recv_thread.hpp"
+#include "decoder_thread.hpp"
+#include <thread>
 
 using namespace std;
 
@@ -38,6 +42,9 @@ int main(int argc, char* argv[]){
         return 1;
     }
 
+    int rcvbuf = 10 * 1024 * 1024;  // 10 MB
+    setsockopt(client_fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf));
+
     sockaddr_in dest{};
     dest.sin_family = AF_INET;
     dest.sin_port   = htons(9000);
@@ -53,7 +60,7 @@ int main(int argc, char* argv[]){
     );
     if (!ffplay) cerr << "Warning: ffplay not available. Saving to file only.\n";
 
-    // Video output
+    // Video writer output
     cv::VideoWriter writer(
         output_filename,
         cv::VideoWriter::fourcc('m','p','4','v'),
@@ -62,93 +69,30 @@ int main(int argc, char* argv[]){
         false  // grayscale
     );
 
-    cout << "Receiving and decoding video...\n";
-    if (ffplay) cout << "Live playback started in ffplay window\n";
+    cout << "Starting multithreaded receive and decode...\n";
+    if (ffplay) cout << "Live playback\n";
 
-    // Receive buffer 
-    char buf[17 + CHUNK_SIZE];
+    // Create shared queue
+    FrameQueue frame_queue(30);  // Buffer up to 30 frames
 
-    uint32_t frames_received = 0;
+    // Create thread objects
+    ReceiverThread receiver(client_fd, width, height, frame_queue);
+    DecoderThread decoder(frame_queue, ffplay, writer, width, height, Q);
 
-    while (true) {
-        int n = recvfrom(client_fd, buf, sizeof(buf), 0, NULL, NULL);
+    // Launch threads
+    thread receiver_thread([&receiver]() { receiver.run(); });
+    thread decoder_thread([&decoder]() { decoder.run(); });
 
-        if (n < 17) continue;
+    // Wait for completion
+    receiver_thread.join();
+    decoder_thread.join();
 
-        FramePacket pkt;
-        deserializePacket(pkt, buf);
-
-        if (pkt.type == END) {
-            cout << "Received END packet — stream complete\n";
-            break;
-        }
-
-        if (pkt.type != DATA) continue;  // Ignore unexpected packet types
-
-        chunk_buffer[pkt.seq][pkt.chunk_id] =
-            vector<uint8_t>(pkt.data, pkt.data + pkt.length);
-        frame_total_chunks[pkt.seq] = pkt.chunk_total;
-
-        if (chunk_buffer[pkt.seq].size() != frame_total_chunks[pkt.seq])
-            continue;
-
-        vector<uint8_t> compressed_frame;
-        compressed_frame.reserve(pkt.chunk_total * CHUNK_SIZE);
-        for (uint32_t i = 0; i < pkt.chunk_total; i++) {
-            auto& chunk = chunk_buffer[pkt.seq][i];
-            compressed_frame.insert(compressed_frame.end(), chunk.begin(), chunk.end());
-        }
-
-        // cout << "Frame " << pkt.seq << ": reassembled " << compressed_frame.size()
-        //      << " bytes from " << pkt.chunk_total << " chunk(s)\n";
-
-        const int decompressed_size = width * height * sizeof(short);
-        vector<short> quantized(width * height);
-
-        int result = LZ4_decompress_safe(
-            (const char*)compressed_frame.data(),
-            (char*)quantized.data(),
-            (int)compressed_frame.size(),
-            decompressed_size
-        );
-
-        if (result < 0) {
-            cerr << "LZ4 decompression failed for frame " << pkt.seq
-                 << " (error " << result << ", input " << compressed_frame.size() << " bytes)\n";
-            // Clean up and skip this frame
-            chunk_buffer.erase(pkt.seq);
-            frame_total_chunks.erase(pkt.seq);
-            continue;
-        }
-
-        // CPU IDCT
-        uint8_t* pixels = cpu_idct_frame(quantized.data(), width, height);
-
-        // Live playback
-        if (ffplay) {
-            fwrite(pixels, 1, width * height, ffplay);
-            fflush(ffplay);
-        }
-
-        // Save frame to output
-        cv::Mat frame(height, width, CV_8UC1, pixels);
-        writer.write(frame);
-
-        delete[] pixels;
-
-        chunk_buffer.erase(pkt.seq);
-        frame_total_chunks.erase(pkt.seq);
-
-        frames_received++;
-        // if (frames_received % 100 == 0)
-        //     cout << "Decoded " << frames_received << " frames...\n";
-    }
-
+    // Cleanup
     if (ffplay) pclose(ffplay);
     writer.release();
     close(client_fd);
 
-    cout << "Total frames: " << frames_received << "\n";
+    cout << "\nStreaming complete!\n";
     cout << "Video saved to: " << output_filename << "\n";
 
     return 0;

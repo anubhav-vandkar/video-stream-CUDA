@@ -7,6 +7,6 @@
 
 #define QUANTIZATION 25
 
-const int Q = 16;
+const int Q = 32;
 
 #endif // CONFIG_H
