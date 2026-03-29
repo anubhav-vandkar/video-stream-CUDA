@@ -1,22 +1,24 @@
-#include <vector>
-#include <string>
-#include <chrono>
 #include <iostream>
-#include <opencv2/opencv.hpp>
+#include <fstream>
+#include <string>
 #include <arpa/inet.h>
-#include <thread>
 #include <unistd.h>
 
 #include "utils/udp_utils.hpp"
-#include "utils/gpu_utils.hpp"
-
-using ms = chrono::milliseconds;
+#include "utils/encoder_interface.hpp"
 
 using namespace std;
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        cerr << "Usage: ./server <file_directory>\n";
+    if (argc < 2) {
+        cerr << "Usage: ./server <file_directory> [--gpu|--cpu]\n";
+#ifdef USE_GPU
+        cerr << "  Compiled with GPU support\n";
+        cerr << "  --gpu: Use GPU encoder (default)\n";
+        cerr << "  --cpu: Force CPU encoder\n";
+#else
+        cerr << "  Compiled without GPU support (CPU only)\n";
+#endif
         return 1;
     }
 
@@ -24,11 +26,36 @@ int main(int argc, char *argv[]) {
     if (file_dir.back() != '/') {
         file_dir += '/';
     }
+    
+    // Parse encoder mode
+    bool use_gpu = false;
+    
+#ifdef USE_GPU
+    // Default to GPU if available
+    use_gpu = true;
+    
+    // Check for explicit flags
+    if (argc >= 3) {
+        if (string(argv[2]) == "--cpu") {
+            use_gpu = false;
+        } else if (string(argv[2]) == "--gpu") {
+            use_gpu = true;
+        }
+    }
+#else
+    // No GPU available, always use CPU
+    use_gpu = false;
+    
+    if (argc >= 3 && string(argv[2]) == "--gpu") {
+        cerr << "Warning: --gpu requested but server compiled without CUDA\n";
+        cerr << "Using CPU encoder instead\n";
+    }
+#endif
 
-    // Socket
+    // Socket setup
     int server_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (server_fd < 0) {
-        cerr << "Socket creation failed" << endl;
+        cerr << "Socket creation failed\n";
         return 1;
     }
 
@@ -42,7 +69,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    cout << "Server listening on port 9000" << endl;
+    cout << "Server listening on port 9000\n";
+#ifdef USE_GPU
+    cout << "GPU support: ENABLED\n";
+#else
+    cout << "GPU support: DISABLED (CPU-only build)\n";
+#endif
 
     uint8_t buffer[150000];
     FramePacket pkt;
@@ -50,14 +82,12 @@ int main(int argc, char *argv[]) {
     socklen_t slen = sizeof(client);
 
     while (true) {
-        cout << "Waiting for client request...\n";
+        cout << "\nWaiting for client request...\n";
 
-        // Receive REQUEST
-        int n = recvfrom(server_fd, buffer, sizeof(buffer), 0, (sockaddr*)&client, &slen);
+        int n = recvfrom(server_fd, buffer, sizeof(buffer), 0, 
+                        (sockaddr*)&client, &slen);
         
-        cout << "Received packet of size " << n << " bytes\n";
-        
-        if (n < 12) continue;  // Too small, ignore
+        if (n < 17) continue;
         
         deserializePacket(pkt, (char*)buffer);
 
@@ -66,7 +96,7 @@ int main(int argc, char *argv[]) {
              << ", length=" << pkt.length << "\n";
 
         if (pkt.type != REQUEST) {
-            cout << "Expected REQUEST packet, got type " << (int)pkt.type << "\n";
+            cout << "Expected REQUEST packet\n";
             continue;
         }
 
@@ -82,27 +112,15 @@ int main(int argc, char *argv[]) {
         ifstream file_check(full_path, ios::binary);
         if (!file_check) {
             cerr << "File not found: " << full_path << "\n";
-            // TODO: Send error packet
             continue;
         }
         file_check.close();
 
-        cout << "File found!";
+        cout << "File found! Starting stream...\n";
 
-        // Open video
-        cv::VideoCapture cap(full_path);
-        if (!cap.isOpened()) {
-            cerr << "Cannot open video\n";
-            continue;
-        }
-
-        uint32_t seq = 0;
-
-        cout<< "Starting video encoding and streaming...\n";
-
-        encode_video_gpu(full_path.c_str(), server_fd, client);
+        encode_and_send(full_path.c_str(), server_fd, client, use_gpu);
         
-        cout << "Stream complete!\n\n";
+        cout << "Stream complete!\n";
     }
 
     close(server_fd);

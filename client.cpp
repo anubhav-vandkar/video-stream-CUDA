@@ -2,8 +2,6 @@
 #include <cstring>
 #include <arpa/inet.h>
 #include <unistd.h>
-#include <chrono>
-#include <fstream>
 #include <vector>
 #include <map>
 #include <opencv2/opencv.hpp>
@@ -11,10 +9,9 @@
 
 #include "utils/udp_utils.hpp"
 #include "utils/cpu_utils.hpp"
+#include "config.hpp"
 
 using namespace std;
-
-#define Q 50
 
 // FRAGMENTATION IMPLEMENTATION
 // frame_id, chunk_id, data
@@ -28,15 +25,13 @@ int main(int argc, char* argv[]){
         return 1;
     }
 
-    const char *dest_ip = argv[1];
-    const char *remote_filename = argv[2];
-    const char *output_filename = argv[3];
-
+    const char* dest_ip = argv[1];
+    const char* remote_filename = argv[2];
+    const char* output_filename = argv[3];
     const int width = atoi(argv[4]);
     const int height = atoi(argv[5]);
 
-    using clock = chrono::steady_clock;
-
+    // Socket setup
     int client_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (client_fd < 0) {
         cerr << "Socket creation failed\n";
@@ -45,125 +40,116 @@ int main(int argc, char* argv[]){
 
     sockaddr_in dest{};
     dest.sin_family = AF_INET;
-    dest.sin_port = htons(9000);
+    dest.sin_port   = htons(9000);
     inet_pton(AF_INET, dest_ip, &dest.sin_addr);
-
-    char buf[150000];
-    socklen_t dlen = sizeof(dest);
 
     sendRequest(client_fd, dest, remote_filename);
 
     FILE* ffplay = popen(
-        ("ffplay -f rawvideo -pixel_format gray -video_size " + to_string(width) + "x" + to_string(height) + " "
-        "-framerate 30 -i - 2>/dev/null").c_str(),
+        ("ffplay -f rawvideo -pixel_format gray -video_size "
+         + to_string(width) + "x" + to_string(height)
+         + " -framerate " + to_string(FPS) + " -i - 2>/dev/null").c_str(),
         "w"
     );
+    if (!ffplay) cerr << "Warning: ffplay not available. Saving to file only.\n";
 
-    if (!ffplay) {
-        cerr << "Warning: ffplay not available. Saving to file only.\n";
-    }
-
-    // Open video writer for saving
+    // Video output
     cv::VideoWriter writer(
         output_filename,
         cv::VideoWriter::fourcc('m','p','4','v'),
-        30,
+        FPS,
         cv::Size(width, height),
-        false
+        false  // grayscale
     );
 
     cout << "Receiving and decoding video...\n";
     if (ffplay) cout << "Live playback started in ffplay window\n";
 
-    cout<< "Waiting for video stream...\n";
-    ofstream outfile(output_filename, ios::binary);
+    // Receive buffer 
+    char buf[17 + CHUNK_SIZE];
 
-    uint32_t next_to_decode = 0;
     uint32_t frames_received = 0;
-
-    map<uint32_t, vector<uint8_t>> recv_buffer;
 
     while (true) {
         int n = recvfrom(client_fd, buf, sizeof(buf), 0, NULL, NULL);
-        if (n < 9) continue;
-        
+
+        if (n < 17) continue;
+
         FramePacket pkt;
         deserializePacket(pkt, buf);
-        
+
         if (pkt.type == END) {
-            cout << "Received end of stream packet\n";
+            cout << "Received END packet — stream complete\n";
             break;
         }
 
-        // FRAGMENTATION REASSEMBLY
-        chunk_buffer[pkt.seq][pkt.chunk_id] = 
-        vector<uint8_t>(pkt.data, pkt.data + pkt.length);
+        if (pkt.type != DATA) continue;  // Ignore unexpected packet types
+
+        chunk_buffer[pkt.seq][pkt.chunk_id] =
+            vector<uint8_t>(pkt.data, pkt.data + pkt.length);
         frame_total_chunks[pkt.seq] = pkt.chunk_total;
 
         if (chunk_buffer[pkt.seq].size() != frame_total_chunks[pkt.seq])
             continue;
 
-        cout << "Frame " << pkt.seq << " chunks stored: ";
-        for (auto& [chunk_id, data] : chunk_buffer[pkt.seq]) {
-            cout << chunk_id << "(" << data.size() << "B) ";
-        }
-        cout << "\n";
-
-        vector<uint8_t> full_frame;
+        vector<uint8_t> compressed_frame;
+        compressed_frame.reserve(pkt.chunk_total * CHUNK_SIZE);
         for (uint32_t i = 0; i < pkt.chunk_total; i++) {
             auto& chunk = chunk_buffer[pkt.seq][i];
-            full_frame.insert(full_frame.end(), chunk.begin(), chunk.end());
+            compressed_frame.insert(compressed_frame.end(), chunk.begin(), chunk.end());
         }
 
-        cout << "Frame " << pkt.seq << ": reassembled " << full_frame.size() 
-        << " bytes from " << pkt.chunk_total << " chunks\n";
-        
-        short* quantized = new short[width * height];
+        cout << "Frame " << pkt.seq << ": reassembled " << compressed_frame.size()
+             << " bytes from " << pkt.chunk_total << " chunk(s)\n";
+
+        const int decompressed_size = width * height * sizeof(short);
+        vector<short> quantized(width * height);
+
         int result = LZ4_decompress_safe(
-            (char*)pkt.data,
-            (char*)quantized,
-            pkt.length,
-            width * height * sizeof(short)
+            (const char*)compressed_frame.data(),
+            (char*)quantized.data(),
+            (int)compressed_frame.size(),
+            decompressed_size
         );
 
-        if(result < 0){
-            cerr << "LZ4 decompression failed for frame " << pkt.seq << endl;
-            delete[] quantized;
+        if (result < 0) {
+            cerr << "LZ4 decompression failed for frame " << pkt.seq
+                 << " (error " << result << ", input " << compressed_frame.size() << " bytes)\n";
+            // Clean up and skip this frame
+            chunk_buffer.erase(pkt.seq);
+            frame_total_chunks.erase(pkt.seq);
             continue;
         }
-        
+
         // CPU IDCT
-        uint8_t* pixels = cpu_idct_frame(quantized, width, height, Q);
-        
+        uint8_t* pixels = cpu_idct_frame(quantized.data(), width, height);
+
         // Live playback
         if (ffplay) {
             fwrite(pixels, 1, width * height, ffplay);
             fflush(ffplay);
         }
-        
-        // Save to file
+
+        // Save frame to output
         cv::Mat frame(height, width, CV_8UC1, pixels);
         writer.write(frame);
-        
-        delete[] quantized;
+
         delete[] pixels;
 
         chunk_buffer.erase(pkt.seq);
         frame_total_chunks.erase(pkt.seq);
-        
+
         frames_received++;
-        
-        if (frames_received % 100 == 0) {
-            cout << "Decoded " << frames_received << " frames..." << endl;
-        }
+        if (frames_received % 100 == 0)
+            cout << "Decoded " << frames_received << " frames...\n";
     }
 
     if (ffplay) pclose(ffplay);
     writer.release();
     close(client_fd);
 
-    cout << "Total frames: " << frames_received << endl;
-    cout << "Video saved to: " << output_filename << endl;
-    
+    cout << "Total frames: " << frames_received << "\n";
+    cout << "Video saved to: " << output_filename << "\n";
+
     return 0;
 }

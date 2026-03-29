@@ -8,8 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-
-#define CHUNK_SIZE 60000
+#include "../config.hpp"
 
 enum FrameType : uint8_t {
     REQUEST = 0x01,
@@ -25,7 +24,7 @@ struct FramePacket {
     uint32_t chunk_id;
     uint32_t chunk_total;
 
-    char data[CHUNK_SIZE];
+    uint8_t data[CHUNK_SIZE];
 };
 
 inline void serializePacket(const FramePacket &pkt, uint8_t *buf) {

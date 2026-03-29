@@ -179,7 +179,7 @@ void encode_video_gpu(
         cout << "Encoded and sent frame " << seq << " (compressed size: " << compressed_size << " bytes)" << endl;
         
         // Rate limit
-        usleep(16500);  // 60 FPS
+        // usleep(16500);  // 60 FPS
     }
 
     sendStreamEnd(sockfd, client_addr, seq);
