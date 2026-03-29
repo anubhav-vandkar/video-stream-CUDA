@@ -6,14 +6,14 @@
 #include <map>
 #include <opencv2/opencv.hpp>
 #include <lz4.h>
+#include <thread>
 
 #include "utils/udp_utils.hpp"
 #include "utils/cpu_utils.hpp"
 #include "config.hpp"
-#include "recv_queue.hpp"
-#include "recv_thread.hpp"
-#include "decoder_thread.hpp"
-#include <thread>
+#include "utils/recv_queue.hpp"
+#include "utils/recv_thread.hpp"
+#include "utils/decoder_thread.hpp"
 
 using namespace std;
 
