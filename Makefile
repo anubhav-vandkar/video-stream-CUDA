@@ -50,5 +50,3 @@ cpu: server_cpu client
 
 clean:
 	rm -f client server server.o dct/*.o
-
-.PHONY: all check_cuda gpu cpu clean

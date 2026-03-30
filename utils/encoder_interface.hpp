@@ -60,8 +60,7 @@ void encode_and_send(
         
         EncodedFrame encoded = cpu_encode_frame(gray, seq);
         
-        sendFrame(sockfd, client_addr, 
-                  (char*)encoded.data.data(), encoded.size, seq);
+        sendFrame(sockfd, client_addr, (char*)encoded.data.data(), encoded.size, seq);
         
         seq++;
         

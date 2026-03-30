@@ -33,15 +33,6 @@ int main(int argc, char *argv[]) {
 #ifdef USE_GPU
     // Default to GPU if available
     use_gpu = true;
-    
-    // Check for explicit flags
-    if (argc >= 3) {
-        if (string(argv[2]) == "--cpu") {
-            use_gpu = false;
-        } else if (string(argv[2]) == "--gpu") {
-            use_gpu = true;
-        }
-    }
 #else
     // No GPU available, always use CPU
     use_gpu = false;
